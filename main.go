@@ -10,8 +10,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/ingcr3at1on/glas"
-	pb "github.com/ingcr3at1on/glas/proto"
+	glas "github.com/glasware/glas-core"
+	pb "github.com/glasware/glas-core/proto"
 )
 
 // Wrap our functionality to allow defer to work with exit.

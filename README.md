@@ -1,8 +1,8 @@
-# Glas
+# Glas CLI
 
-[![goreportcard](https://goreportcard.com/badge/github.com/ingcr3at1on/glas)](https://github.com/ingcr3at1on/glas)
+[![goreportcard](https://goreportcard.com/badge/github.com/glasware/cli)](https://github.com/glasware/cli)
 
-Telnet based MUD client framework. User-facing implementations can be found in the cmd package.
+A command line front end for the Glas MUD client.
 
 Issues and pull requests are welcome.
 
