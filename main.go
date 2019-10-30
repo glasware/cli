@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/ingcr3at1on/x/sigctx"
@@ -31,12 +32,17 @@ func init() {
 func runE(cmd *cobra.Command, args []string) error {
 	ctx, cancel := sigctx.WithCancel(context.Background())
 
-	web, err := root.Flags().GetString(glasWeb)
+	web, err := cmd.Flags().GetString(glasWeb)
 	if err != nil {
 		return err
 	}
 	if web != `` {
-		return startWeb()
+		_url, err := url.Parse(web)
+		if err != nil {
+			return err
+		}
+
+		return startWeb(ctx, cancel, _url.String())
 	}
 
 	return startStandalone(ctx, cancel)
