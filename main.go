@@ -1,106 +1,72 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 
-	glas "github.com/glasware/glas-core"
-	pb "github.com/glasware/glas-core/proto"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/glasware/glas-core"
+	"github.com/spf13/afero"
 )
 
-// Wrap our functionality to allow defer to work with exit.
-func _main() error {
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+type (
+	surface struct {
+		m    model
+		buf  *bytes.Buffer
+		in   chan string
+		glas glas.Glas
+		prog *tea.Program
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		<-sc
-		cancel()
-	}()
+		errCh chan error
+	}
+)
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, 1)
-	inCh := make(chan *pb.Input)
-	outCh := make(chan *pb.Output)
+func main() {
+	if err := start(); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+}
 
-	// Don't put this in our waitgroup, it will never finish.
-	go func() {
-		for {
-			out := <-outCh
-			if out != nil {
-				n, err := os.Stdout.WriteString(out.Data)
-				if err != nil {
-					errCh <- err
-					return
-				}
+func start() error {
+	s := surface{
+		buf:   new(bytes.Buffer),
+		in:    make(chan string),
+		errCh: make(chan error, 1),
+	}
 
-				if n != len(out.Data) {
-					errCh <- io.ErrShortWrite
-					return
-				}
-			}
-		}
-	}()
+	s.m = initialModel(&s)
 
-	g, err := glas.New(&glas.Config{
-		Input:  inCh,
-		Output: outCh,
-	})
+	var err error
+	s.glas, err = glas.New(s.in, pipe{&s}, "./cfg", glas.OptAfs(afero.NewOsFs())) // FIXME: this path should come from env or flags.
 	if err != nil {
 		return err
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		if err := g.Start(ctx, cancel); err != nil {
-			errCh <- err
-			return
+	go func() {
+		if err := s.glas.Start(ctx); err != nil {
+			s.errCh <- fmt.Errorf("m.glas.Start -- %w", err)
 		}
 	}()
 
-	// Don't put this in the waitgroup because it can and will continue running
-	// until we stop it.
+	s.prog = tea.NewProgram(s.m)
+
 	go func() {
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			inCh <- &pb.Input{
-				Data: scanner.Text(),
-			}
+		if err := s.prog.Start(); err != nil {
+			s.errCh <- fmt.Errorf("p.Start -- %w", err)
 		}
 
-		if err := scanner.Err(); err != nil {
-			if err != io.EOF {
-				errCh <- err
-			}
-		}
+		close(s.errCh)
 	}()
 
-	select {
-	case <-ctx.Done():
-		break
-	case err := <-errCh:
-		if err != nil {
-			return err
-		}
+	if err := <-s.errCh; err != nil {
+		return err
 	}
 
-	wg.Wait()
-	fmt.Println("exiting")
 	return nil
-}
-
-func main() {
-	if err := _main(); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
 }
