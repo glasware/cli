@@ -1,10 +1,12 @@
 package main
 
 import (
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/glasware/glas-core"
 )
 
 const terminalWidth = 90
@@ -31,9 +33,28 @@ func initialModel(surface *surface) model {
 	m.textinput.Width = terminalWidth
 	m.textinput.Placeholder = "Send a command..."
 	m.textinput.Prompt = "| "
+	m.textinput.KeyMap.DeleteBeforeCursor.Unbind()
 	m.textinput.Focus()
 
 	m.viewport = viewport.New(terminalWidth, m.height(40))
+	m.viewport.KeyMap = viewport.KeyMap{
+		HalfPageUp: key.NewBinding(
+			key.WithKeys("pgup"),
+			key.WithHelp("pgup", "½ page up"),
+		),
+		HalfPageDown: key.NewBinding(
+			key.WithKeys("pgdown"),
+			key.WithHelp("pgdown", "½ page down"),
+		),
+		Up: key.NewBinding(
+			key.WithKeys("ctrl+up"),
+			key.WithHelp("ctrl+↑", "up"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("ctrl+down"),
+			key.WithHelp("ctrl+↓", "down"),
+		),
+	}
 	m.viewport.SetContent(m.surface.buf.String())
 	m.viewport.GotoBottom()
 
@@ -56,9 +77,10 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC:
 			m.textinput.Reset()
 		case tea.KeyEsc:
-			return m, tea.Quit
+			m.surface.errCh <- glas.ErrExit
+			return m, nil
 		case tea.KeyEnter:
-			m.surface.glas.SendInput(m.textinput.Value())
+			m.surface.in <- m.textinput.Value()
 			m.textinput.Reset()
 		}
 
