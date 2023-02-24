@@ -2,11 +2,11 @@ package main
 
 import (
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/glasware/glas-core"
+	"github.com/knz/bubbline/editline"
 )
 
 const terminalWidth = 90
@@ -14,7 +14,9 @@ const terminalWidth = 90
 type (
 	model struct {
 		viewport  viewport.Model
-		textinput textinput.Model
+		textinput *editline.Model
+
+		//textinput textinput.Model
 
 		surface *surface
 	}
@@ -26,11 +28,11 @@ var _ tea.Model = new(model)
 
 func initialModel(surface *surface) model {
 	m := model{
-		textinput: textinput.New(),
-		surface:   surface,
+		//textinput: textinput.New(),
+		surface: surface,
 	}
 
-	m.textinput.Width = terminalWidth
+	m.textinput = editline.New(terminalWidth, 1)
 	m.textinput.Placeholder = "Send a command..."
 	m.textinput.Prompt = "| "
 	m.textinput.KeyMap.DeleteBeforeCursor.Unbind()
@@ -62,7 +64,7 @@ func initialModel(surface *surface) model {
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return nil
 }
 
 func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
@@ -74,8 +76,8 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := message.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC:
-			m.textinput.Reset()
+		//case tea.KeyCtrlC:
+		//	m.textinput.Reset()
 		case tea.KeyEsc:
 			m.surface.errCh <- glas.ErrExit
 			return m, nil
@@ -99,7 +101,7 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, cmd = m.viewport.Update(message)
 	cmds = append(cmds, cmd)
 
-	m.textinput, cmd = m.textinput.Update(message)
+	_, cmd = m.textinput.Update(message)
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
